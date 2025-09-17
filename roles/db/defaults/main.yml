@@ -1,0 +1,2 @@
+db_charset: utf8mb4
+db_collation: utf8mb4_unicode_ci

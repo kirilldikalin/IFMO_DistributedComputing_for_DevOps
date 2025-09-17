@@ -1,12 +1,48 @@
----
-- name: Home work 1
+- name: Deploy WP with external DB
   hosts: carrier
-  tasks:
-    - name: Display Configuration Variables
+  gather_facts: true
+  become: true
+
+  pre_tasks:
+    - name: Show target
       ansible.builtin.debug:
-        msg:
-          - "wordpress: {{ is_wordpress }}" # True or False
-          - "wordpress_port: {{ wordpress_port }}" # 80 or 8080 or whatewer
-          - "wordpress_db_name: {{ wordpress_db_name }}" # WP database name
-          - "db_host: {{ db_host }}" # container name
-          - "db_pass: {{ db_pass }}" # root password
+        msg: "Deploying to {{ inventory_hostname }} at {{ ansible_host }}"
+
+  roles:
+    - { role: docker, tags: ['docker'] }
+    - { role: network, tags: ['network'] }
+    - { role: db, tags: ['db'] }
+
+  tasks:
+    - name: Wait until DB container is healthy
+      community.docker.docker_container_info:
+        name: "{{ db_container_name }}"
+      register: db_info
+      until: db_info.container.State.Health.Status is defined and db_info.container.State.Health.Status == "healthy"
+      retries: 30
+      delay: 2
+      tags: ['db']
+
+    - name: Include WordPress role
+      ansible.builtin.include_role:
+        name: wordpress
+      when: is_wordpress
+      tags: ['wp']
+
+    - name: Wait HTTP of WordPress
+      ansible.builtin.uri:
+        url: "http://{{ hostvars[inventory_hostname].ansible_host | default(inventory_hostname) }}:{{ wordpress_port }}"
+        status_code: 200,301,302
+        return_content: false
+      register: wp_http
+      until: wp_http.status in [200,301,302]
+      retries: 20
+      delay: 3
+      when: is_wordpress
+      tags: ['wp']
+
+    - name: Output WP URL
+      ansible.builtin.debug:
+        msg: "WordPress URL http://{{ hostvars[inventory_hostname].ansible_host | default(inventory_hostname) }}:{{ wordpress_port }}"
+      when: is_wordpress
+      tags: ['wp']

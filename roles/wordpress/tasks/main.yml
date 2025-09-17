@@ -1,0 +1,22 @@
+- name: Ensure WP volume
+  community.docker.docker_volume:
+    name: "{{ wp_volume }}"
+    state: present
+
+- name: Run WordPress container
+  community.docker.docker_container:
+    name: "{{ wp_container_name }}"
+    image: "{{ wp_image }}"
+    state: started
+    restart_policy: always
+    networks:
+      - name: "{{ docker_network_name }}"
+    volumes:
+      - "{{ wp_volume }}:/var/www/html"
+    env:
+      WORDPRESS_DB_HOST: "{{ db_host }}:{{ db_port }}"
+      WORDPRESS_DB_NAME: "{{ wordpress_db_name }}"
+      WORDPRESS_DB_USER: "{{ wordpress_db_user }}"
+      WORDPRESS_DB_PASSWORD: "{{ wordpress_db_password }}"
+    published_ports:
+      - "{{ wordpress_port }}:80"

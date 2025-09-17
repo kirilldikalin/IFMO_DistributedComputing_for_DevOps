@@ -1,0 +1,18 @@
+is_wordpress: true
+
+docker_network_name: wpnet
+db_container_name: wp-db
+wp_container_name: wp-app
+
+db_image: mariadb:10.11
+wp_image: wordpress:6.6-apache
+
+wordpress_port: 8080
+db_host: "{{ db_container_name }}"
+db_port: 3306
+
+wordpress_db_name: wpdb
+wordpress_db_user: wpuser
+
+wp_volume: wp_data
+db_volume: db_data

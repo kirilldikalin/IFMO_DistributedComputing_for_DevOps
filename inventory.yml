@@ -1,9 +1,9 @@
 all:
-  hosts:
+  children:
     carrier:
-      ansible_host: 192.168.XXX.XXX
-      ansible_user: XXXXXXXX
-      ansible_password: XXXXXXXX
-      ansible_become_method: sudo
-      ansible_become_pass: XXXXXXXX
-      ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+      hosts:
+        yc-wp-1:
+          ansible_host: 51.250.25.239
+          ansible_user: distributedadmin
+          ansible_ssh_private_key_file: ~/.ssh/itmo/itmo_key
+          ansible_python_interpreter: /usr/bin/python3
