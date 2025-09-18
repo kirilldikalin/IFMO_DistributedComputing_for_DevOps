@@ -1,18 +1,39 @@
+# Управление развертыванием
 is_wordpress: true
+use_db_cluster: true
 
+# Docker сеть и имена контейнеров
 docker_network_name: wpnet
-db_container_name: wp-db
+db_primary_container: wp-db-primary
+db_replica_container: wp-db-replica
 wp_container_name: wp-app
 
+# Docker образы
 db_image: mariadb:10.11
 wp_image: wordpress:6.6-apache
 
+# Порты приложения и БД
 wordpress_port: 8080
-db_host: "{{ db_container_name }}"
+# Публикуем MySQL только на loopback ВМ, чтобы модули community.mysql коннектились локально
+db_primary_bind: "127.0.0.1:3306:3306"
+db_replica_bind: "127.0.0.1:3307:3306"
+
+# Хост БД для WordPress - имя контейнера в docker-сети
+db_host: "{{ db_primary_container }}"
 db_port: 3306
 
+# Схема данных WP
 wordpress_db_name: wpdb
 wordpress_db_user: wpuser
 
+# Тома
 wp_volume: wp_data
-db_volume: db_data
+db_primary_volume: db_primary_data
+db_replica_volume: db_replica_data
+
+# Параметры подключения модулей community.mysql (работают на target-хосте)
+mysql_login_host_primary: 127.0.0.1
+mysql_login_port_primary: 3306
+mysql_login_host_replica: 127.0.0.1
+mysql_login_port_replica: 3307
+mysql_login_user: root

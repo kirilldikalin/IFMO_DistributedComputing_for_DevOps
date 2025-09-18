@@ -35,7 +35,7 @@
         status_code: 200,301,302
         return_content: false
       register: wp_http
-      until: wp_http.status in [200,301,302]
+      until: wp_http.status in [200, 301, 302]
       retries: 20
       delay: 3
       when: is_wordpress

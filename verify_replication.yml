@@ -1,0 +1,22 @@
+- name: Verify replication minimal
+  hosts: carrier
+  gather_facts: false
+  tasks:
+    - name: Get replica status
+      community.mysql.mysql_replication:
+        mode: getreplica
+        login_host: "{{ mysql_login_host_replica }}"
+        login_port: "{{ mysql_login_port_replica }}"
+        login_user: "{{ mysql_login_user }}"
+        login_password: "{{ db_root_password }}"
+      register: db_cluster_replica_status
+
+    - name: Show replica status
+      ansible.builtin.debug:
+        var: db_cluster_replica_status
+
+    - name: Assert replica threads running
+      ansible.builtin.assert:
+        that:
+          - (db_cluster_replica_status.Replica_IO_Running | default(db_cluster_replica_status.Slave_IO_Running)) | lower == 'yes'
+          - (db_cluster_replica_status.Replica_SQL_Running | default(db_cluster_replica_status.Slave_SQL_Running)) | lower == 'yes'

@@ -1,0 +1,22 @@
+# Порты, проброшенные на хост для локальных проверок
+db_cluster_primary_bind: "127.0.0.1:3306:3306"
+db_cluster_replica_bind: "127.0.0.1:3307:3306"
+
+# Доступы для модулей community.mysql через проброшенные порты
+db_cluster_mysql_login_user: root
+db_cluster_mysql_login_host_primary: "127.0.0.1"
+db_cluster_mysql_login_port_primary: 3306
+db_cluster_mysql_login_host_replica: "127.0.0.1"
+db_cluster_mysql_login_port_replica: 3307
+
+# Дополнительные аргументы mysqld
+db_cluster_mariadb_primary_extra_args:
+  - "--server-id=1"
+  - "--log-bin=mysql-bin"
+  - "--binlog_format=ROW"
+  - "--log-basename=primary"
+  - "--innodb_flush_log_at_trx_commit=1"
+
+db_cluster_mariadb_replica_extra_args:
+  - "--server-id=2"
+  - "--relay-log=relay-bin"
