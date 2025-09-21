@@ -29,28 +29,14 @@
     creates: /etc/apt/keyrings/docker.gpg
   tags: ['docker']
 
-- name: Remove old Docker repo line (no signed-by)
-  ansible.builtin.apt_repository:
-    repo: "deb https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
-    filename: docker
-    state: absent
-  tags: ['docker']
-
-- name: Remove old Docker repo line (any arch, with signed-by mismatch)
-  ansible.builtin.apt_repository:
-    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
-    filename: docker
-    state: absent
-  tags: ['docker']
-
-- name: Add Docker apt repository (correct signed-by)
+- name: Add Docker apt repository (with signed-by)
   ansible.builtin.apt_repository:
     repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
     filename: docker
     state: present
   tags: ['docker']
 
-- name: apt update (refresh cache)
+- name: Apt update (refresh cache)
   ansible.builtin.apt:
     update_cache: true
   tags: ['docker']

@@ -1,41 +1,34 @@
-# Управление развертыванием
-is_wordpress: true
-use_db_cluster: true
-
-# Docker сеть и имена контейнеров
 docker_network_name: wpnet
-db_primary_container: wp-db-primary
-db_replica_container: wp-db-replica
-wp_container_name: wp-app
 
-# Docker образы
 db_image: mariadb:10.11
-wp_image: wordpress:6.6-apache
-
-# Порты приложения и БД
-wordpress_port: 8080
-# Публикуем MySQL только на loopback ВМ, чтобы модули community.mysql коннектились локально
-db_primary_bind: "127.0.0.1:3306:3306"
-db_replica_bind: "127.0.0.1:3307:3306"
-
-# Хост БД для WordPress - имя контейнера в docker-сети
-
-# Схема данных WP
-wordpress_db_name: wpdb
-wordpress_db_user: wpuser
-
-# Тома
-wp_volume: wp_data
-db_primary_volume: db_primary_data
-db_replica_volume: db_replica_data
-
-# Параметры подключения модулей community.mysql (работают на target-хосте)
-mysql_login_host_primary: 127.0.0.1
-mysql_login_port_primary: 3306
-mysql_login_host_replica: 127.0.0.1
-mysql_login_port_replica: 3307
-mysql_login_user: root
-db_volume: db_data
 db_container_name: wp-db
-db_host: wp-db-primary
+db_volume: db_data
 db_port: 3306
+db_charset: utf8mb4
+
+wordpress_port: 8080
+wordpress_db_user: wpuser
+wordpress_db_password: itmokirill
+wordpress_db_name: wpdb
+
+db_host: "{{ db_container_name }}"
+wordpress_db_host: "{{ db_host }}"
+wordpress_db_port: "{{ db_port }}"
+
+db_cluster_primary_container_name: wp-db-primary
+db_cluster_replica_container_name: wp-db-replica
+db_cluster_primary_volume: db_primary_data
+db_cluster_replica_volume: db_replica_data
+db_cluster_primary_port: 3306
+db_cluster_replica_port: 3307
+
+db_cluster_mysql_login_user: root
+db_cluster_mysql_login_host_primary: 127.0.0.1
+db_cluster_mysql_login_port_primary: 3306
+db_cluster_mysql_login_host_replica: 127.0.0.1
+db_cluster_mysql_login_port_replica: 3307
+
+db_cluster_repl_user: repl
+
+db_repl_user: "{{ db_cluster_repl_user }}"
+db_repl_password: "{{ db_cluster_repl_password | default(vault_db_cluster_repl_password | default(omit)) }}"
