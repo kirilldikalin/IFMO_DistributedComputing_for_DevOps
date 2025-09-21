@@ -55,17 +55,17 @@
     password: "{{ db_cluster_repl_password }}"
     priv: "*.*:REPLICATION SLAVE"
     state: present
-    login_host: "{{ db_cluster_mysql_login_host_primary }}"
-    login_port: "{{ db_cluster_mysql_login_port_primary }}"
-    login_user: "{{ db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_db_cluster_mysql_login_host_primary }}"
+    login_port: "{{ db_cluster_db_cluster_mysql_login_port_primary }}"
+    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
 - name: Get PRIMARY status (idempotent)
   community.mysql.mysql_replication:
     mode: getprimary
-    login_host: "{{ db_cluster_mysql_login_host_primary }}"
-    login_port: "{{ db_cluster_mysql_login_port_primary }}"
-    login_user: "{{ db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_db_cluster_mysql_login_host_primary }}"
+    login_port: "{{ db_cluster_db_cluster_mysql_login_port_primary }}"
+    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
   register: db_cluster_master_status
 
@@ -108,9 +108,9 @@
 - name: Stop replication on REPLICA if running
   community.mysql.mysql_replication:
     mode: stopreplica
-    login_host: "{{ db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
   failed_when: false
   changed_when: false
@@ -118,9 +118,9 @@
 - name: Reset replication config on REPLICA
   community.mysql.mysql_replication:
     mode: resetreplicaall
-    login_host: "{{ db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
 - name: Configure replication on REPLICA (CHANGE MASTER TO)
@@ -131,34 +131,34 @@
     primary_password: "{{ db_repl_password }}"
     primary_log_file: "{{ db_cluster_master_log_file }}"
     primary_log_pos: "{{ db_cluster_master_log_pos }}"
-    login_host: "{{ db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
 - name: Start replication on REPLICA
   community.mysql.mysql_replication:
     mode: startreplica
-    login_host: "{{ db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
 - name: Ensure REPLICA read_only ON
   community.mysql.mysql_variables:
     variable: read_only
     value: "ON"
-    login_host: "{{ db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
 - name: Check REPLICA status is running
   community.mysql.mysql_replication:
     mode: getreplica
-    login_host: "{{ db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
   register: db_cluster_replica_status
 

@@ -32,3 +32,21 @@ db_cluster_repl_user: repl
 
 db_repl_user: "{{ db_cluster_repl_user }}"
 db_repl_password: "{{ db_cluster_repl_password | default(vault_db_cluster_repl_password | default(omit)) }}"
+
+db_cluster_primary_volume: db_primary_data
+db_cluster_replica_volume: db_replica_data
+db_primary_volume: "{{ db_cluster_primary_volume }}"
+db_replica_volume: "{{ db_cluster_replica_volume }}"
+
+db_cluster_primary_container: wp-db-primary
+db_cluster_replica_container: wp-db-replica
+db_primary_container: "{{ db_cluster_primary_container }}"
+db_replica_container: "{{ db_cluster_replica_container }}"
+
+db_cluster_repl_user: "{{ db_cluster_repl_user | default('repl') }}"
+db_cluster_repl_password: "{{ vault_db_cluster_repl_password | default(omit) }}"
+
+wordpress_db_host: "{{ (use_db_cluster|default(false)) | ternary(db_cluster_primary_container, db_container_name|default('wp-db')) }}"
+wordpress_db_port: "{{ (use_db_cluster|default(false)) | ternary(db_cluster_primary_port|default(3306), db_port|default(3306)) }}"
+
+db_root_password: "{{ db_root_password | default(vault_db_root_password | default(omit)) }}"
