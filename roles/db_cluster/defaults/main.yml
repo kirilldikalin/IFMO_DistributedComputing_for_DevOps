@@ -2,6 +2,10 @@
 db_cluster_primary_bind: "127.0.0.1:3306:3306"
 db_cluster_replica_bind: "127.0.0.1:3307:3306"
 
+# Репликация (дефолты и ссылки на vault-переменные)
+db_cluster_repl_user: repl
+db_cluster_repl_password: "{{ vault_db_cluster_repl_password | default(omit) }}"
+
 # Доступы для модулей community.mysql через проброшенные порты
 db_cluster_mysql_login_user: root
 db_cluster_mysql_login_host_primary: "127.0.0.1"
@@ -20,3 +24,6 @@ db_cluster_mariadb_primary_extra_args:
 db_cluster_mariadb_replica_extra_args:
   - "--server-id=2"
   - "--relay-log=relay-bin"
+
+
+

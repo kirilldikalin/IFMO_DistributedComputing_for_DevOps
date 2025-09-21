@@ -1,27 +1,3 @@
-- name: Remove any Docker apt list files in sources.list.d
-  ansible.builtin.find:
-    paths: /etc/apt/sources.list.d
-    patterns: 'docker*.list*'
-    file_type: file
-  register: docker_lists
-  failed_when: false
-  tags: ['docker']
-
-- name: Remove found Docker apt list files
-  ansible.builtin.file:
-    path: "{{ item.path }}"
-    state: absent
-  loop: "{{ docker_lists.files | default([]) }}"
-  when: docker_lists.files is defined
-  tags: ['docker']
-
-- name: Remove any Docker lines from /etc/apt/sources.list
-  ansible.builtin.replace:
-    path: /etc/apt/sources.list
-    regexp: '^\s*deb\s+.*download\.docker\.com.*$'
-    replace: ''
-  tags: ['docker']
-
 - name: Ensure prerequisites packages are present (no cache refresh)
   ansible.builtin.apt:
     name:
@@ -33,20 +9,48 @@
     update_cache: false
   tags: ['docker']
 
-- name: Install Docker apt key (module, no command)
-  ansible.builtin.apt_key:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
+- name: Ensure keyrings dir exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
   tags: ['docker']
 
-- name: Add Docker apt repository (no signed-by)
+- name: Download Docker GPG key (ASCII)
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+  tags: ['docker']
+
+- name: Convert Docker key to gpg (idempotent)
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /etc/apt/keyrings/docker.gpg /etc/apt/keyrings/docker.asc
+    creates: /etc/apt/keyrings/docker.gpg
+  tags: ['docker']
+
+- name: Remove old Docker repo line (no signed-by)
+  ansible.builtin.apt_repository:
+    repo: "deb https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    filename: docker
+    state: absent
+  tags: ['docker']
+
+- name: Remove old Docker repo line (any arch, with signed-by mismatch)
   ansible.builtin.apt_repository:
     repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    filename: docker
+    state: absent
+  tags: ['docker']
+
+- name: Add Docker apt repository (correct signed-by)
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
     filename: docker
     state: present
   tags: ['docker']
 
-- name: Refresh APT cache
+- name: apt update (refresh cache)
   ansible.builtin.apt:
     update_cache: true
   tags: ['docker']

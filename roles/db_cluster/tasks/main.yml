@@ -50,9 +50,9 @@
 
 - name: Ensure replication user on PRIMARY
   community.mysql.mysql_user:
-    name: "{{ db_repl_user }}"
+    name: "{{ db_cluster_repl_user }}"
     host: "%"
-    password: "{{ db_repl_password }}"
+    password: "{{ db_cluster_repl_password }}"
     priv: "*.*:REPLICATION SLAVE"
     state: present
     login_host: "{{ db_cluster_mysql_login_host_primary }}"
