@@ -8,12 +8,6 @@
       ansible.builtin.debug:
         msg: "Deploying to {{ inventory_hostname }} at {{ ansible_host }}"
 
-    # ВАЖНО: передаем роли wordpress готовый host:port без двойного :3306
-    - name: Set WordPress DB host (single DB)
-      ansible.builtin.set_fact:
-        wordpress_db_host: "{{ db_container_name }}:{{ db_port | default(3306) }}"
-      tags: ['wp']
-
   roles:
     - role: docker
       tags: ['docker']
@@ -32,9 +26,12 @@
       delay: 2
       tags: ['db']
 
-    - name: Include WordPress role
+    - name: Include WordPress role (single DB)
       ansible.builtin.include_role:
         name: wordpress
+      vars:
+        wordpress_db_host: "{{ db_container_name }}"
+        wordpress_db_port: "{{ db_port | default(3306) }}"
       when: is_wordpress | default(true)
       tags: ['wp']
 
