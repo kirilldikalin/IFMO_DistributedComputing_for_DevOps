@@ -22,7 +22,7 @@ db_cluster_mysql_login_port_primary: 3306
 db_cluster_mysql_login_host_replica: 127.0.0.1
 db_cluster_mysql_login_port_replica: 3307
 
-db_root_password: "{{ db_root_password | default(vault_db_root_password | default(omit)) }}"
+db_root_password: "{{ vault_db_root_password }}"
 db_primary_volume: db_primary_data
 db_replica_volume: db_replica_data
 
@@ -46,3 +46,4 @@ wordpress_db_port: "{{ db_cluster_primary_port }}"
 
 db_cluster_mariadb_primary_extra_args: "--server-id=1 --log-bin=mysql-bin --binlog-format=ROW --skip-slave-start"
 db_cluster_mariadb_replica_extra_args: "--server-id=2 --relay-log=relay-bin --read-only=ON --skip-slave-start"
+db_remove_legacy_single: true
