@@ -15,8 +15,6 @@ db_host: "{{ db_container_name }}"
 
 db_cluster_primary_container_name: wp-db-primary
 db_cluster_replica_container_name: wp-db-replica
-db_cluster_primary_port: 3306
-db_cluster_replica_port: 3307
 
 db_cluster_mysql_login_user: root
 db_cluster_mysql_login_host_primary: 127.0.0.1
@@ -25,20 +23,26 @@ db_cluster_mysql_login_host_replica: 127.0.0.1
 db_cluster_mysql_login_port_replica: 3307
 
 db_root_password: "{{ db_root_password | default(vault_db_root_password | default(omit)) }}"
-# DB cluster volumes and containers
 db_primary_volume: db_primary_data
 db_replica_volume: db_replica_data
-db_primary_container: wp-db-primary
-db_replica_container: wp-db-replica
 
-# Replication credentials
 db_repl_user: repl
 db_repl_password: "{{ vault_db_cluster_repl_password }}"
 
-# Compatibility for roles expecting cluster_* variables
 db_cluster_repl_user: "{{ db_repl_user }}"
 db_cluster_repl_password: "{{ db_repl_password }}"
 
-# WordPress points to PRIMARY
+db_primary_container: wp-db-primary
+db_replica_container: wp-db-replica
+
+db_cluster_primary_port: 3306
+db_cluster_replica_port: 3307
+
+db_cluster_primary_bind: "{{ db_cluster_primary_port }}:3306"
+db_cluster_replica_bind: "{{ db_cluster_replica_port }}:3306"
+
 wordpress_db_host: "{{ db_primary_container }}"
-wordpress_db_port: 3306
+wordpress_db_port: "{{ db_cluster_primary_port }}"
+
+db_cluster_mariadb_primary_extra_args: "--server-id=1 --log-bin=mysql-bin --binlog-format=ROW --skip-slave-start"
+db_cluster_mariadb_replica_extra_args: "--server-id=2 --relay-log=relay-bin --read-only=ON --skip-slave-start"

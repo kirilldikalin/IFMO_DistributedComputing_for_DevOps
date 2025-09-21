@@ -14,6 +14,33 @@
     name: "{{ db_replica_volume }}"
     state: present
 
+- name: Ensure config dir for MariaDB
+  ansible.builtin.file:
+    path: /opt/wpdb
+    state: directory
+    mode: '0755'
+
+- name: Write MariaDB PRIMARY config
+  ansible.builtin.copy:
+    dest: /opt/wpdb/primary.cnf
+    mode: '0644'
+    content: |
+      [mysqld]
+      server-id=1
+      log-bin=mysql-bin
+      binlog_format=ROW
+      skip-slave-start=1
+
+- name: Write MariaDB REPLICA config
+  ansible.builtin.copy:
+    dest: /opt/wpdb/replica.cnf
+    mode: '0644'
+    content: |
+      [mysqld]
+      server-id=2
+      relay-log=relay-bin
+      read_only=ON
+      skip-slave-start=1
 - name: Run MariaDB PRIMARY
   community.docker.docker_container:
     name: "{{ db_primary_container }}"
@@ -29,7 +56,11 @@
       MARIADB_DATABASE: "{{ wordpress_db_name }}"
       MARIADB_USER: "{{ wordpress_db_user }}"
       MARIADB_PASSWORD: "{{ wordpress_db_password }}"
-    command: "{{ db_cluster_mariadb_primary_extra_args }}"
+    command:
+      - "--server-id=1"
+      - "--log-bin=mysql-bin"
+      - "--binlog-format=ROW"
+      - "--skip-slave-start"
     published_ports:
       - "{{ db_cluster_primary_bind }}"
     healthcheck:
@@ -55,25 +86,30 @@
     password: "{{ db_cluster_repl_password }}"
     priv: "*.*:REPLICATION SLAVE"
     state: present
-    login_host: "{{ db_cluster_db_cluster_mysql_login_host_primary }}"
-    login_port: "{{ db_cluster_db_cluster_mysql_login_port_primary }}"
-    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_mysql_login_host_primary }}"
+    login_port: "{{ db_cluster_mysql_login_port_primary }}"
+    login_user: "{{ db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
-- name: Get PRIMARY status (idempotent)
-  community.mysql.mysql_replication:
-    mode: getprimary
-    login_host: "{{ db_cluster_db_cluster_mysql_login_host_primary }}"
-    login_port: "{{ db_cluster_db_cluster_mysql_login_port_primary }}"
-    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
-    login_password: "{{ db_root_password }}"
-  register: db_cluster_master_status
+- name: Get PRIMARY status via docker exec
+  ansible.builtin.shell: >
+    docker exec {{ db_primary_container }}
+    mysql -uroot -p'{{ db_root_password }}'
+    -e "SHOW MASTER STATUS\\G"
+  register: db_cluster_primary_status_raw
+  changed_when: false
 
-- name: Set facts from PRIMARY STATUS
+- name: Ensure MASTER status has File and Position
+  ansible.builtin.assert:
+    that:
+      - db_cluster_primary_status_raw.stdout is search('^\\s*File:\\s*\\S+', multiline=True)
+      - db_cluster_primary_status_raw.stdout is search('^\\s*Position:\\s*\\d+', multiline=True)
+    fail_msg: "SHOW MASTER STATUS пуст или без File/Position"
+
+- name: Parse PRIMARY status
   ansible.builtin.set_fact:
-    db_cluster_master_log_file: "{{ db_cluster_master_status.File }}"
-    db_cluster_master_log_pos: "{{ db_cluster_master_status.Position }}"
-
+    db_cluster_master_log_file: "{{ (db_cluster_primary_status_raw.stdout | regex_findall('^\\s*File:\\s*(\\S+)', multiline=True))[0] }}"
+    db_cluster_master_log_pos: "{{ (db_cluster_primary_status_raw.stdout | regex_findall('^\\s*Position:\\s*(\\d+)', multiline=True))[0] | int }}"
 - name: Run MariaDB REPLICA
   community.docker.docker_container:
     name: "{{ db_replica_container }}"
@@ -86,7 +122,11 @@
       - "{{ db_replica_volume }}:/var/lib/mysql"
     env:
       MARIADB_ROOT_PASSWORD: "{{ db_root_password }}"
-    command: "{{ db_cluster_mariadb_replica_extra_args }}"
+    command:
+      - "--server-id=2"
+      - "--relay-log=relay-bin"
+      - "--read-only=ON"
+      - "--skip-slave-start"
     published_ports:
       - "{{ db_cluster_replica_bind }}"
     healthcheck:
@@ -108,9 +148,9 @@
 - name: Stop replication on REPLICA if running
   community.mysql.mysql_replication:
     mode: stopreplica
-    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
   failed_when: false
   changed_when: false
@@ -118,9 +158,9 @@
 - name: Reset replication config on REPLICA
   community.mysql.mysql_replication:
     mode: resetreplicaall
-    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
 - name: Configure replication on REPLICA (CHANGE MASTER TO)
@@ -131,34 +171,34 @@
     primary_password: "{{ db_repl_password }}"
     primary_log_file: "{{ db_cluster_master_log_file }}"
     primary_log_pos: "{{ db_cluster_master_log_pos }}"
-    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
 - name: Start replication on REPLICA
   community.mysql.mysql_replication:
     mode: startreplica
-    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
 - name: Ensure REPLICA read_only ON
   community.mysql.mysql_variables:
     variable: read_only
     value: "ON"
-    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
 - name: Check REPLICA status is running
   community.mysql.mysql_replication:
     mode: getreplica
-    login_host: "{{ db_cluster_db_cluster_mysql_login_host_replica }}"
-    login_port: "{{ db_cluster_db_cluster_mysql_login_port_replica }}"
-    login_user: "{{ db_cluster_db_cluster_mysql_login_user }}"
+    login_host: "{{ db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
   register: db_cluster_replica_status
 
