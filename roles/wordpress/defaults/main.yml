@@ -1,8 +1,8 @@
 wordpress_image: wordpress:6.6-apache
 wordpress_container_name: wp-app
 wordpress_port: 8080
-wp_volume: wp_data
 
-# Новые имена per ansible-lint; совместимы со старым стилем
+wordpress_volume: wp_data
+
 wordpress_db_host: "{{ db_host | default('wp-db') }}"
 wordpress_db_port: "{{ db_port | default(3306) }}"

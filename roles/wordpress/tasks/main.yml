@@ -1,3 +1,8 @@
+- name: Ensure WordPress volume
+  community.docker.docker_volume:
+    name: "{{ wordpress_volume }}"
+    state: present
+
 - name: Run WordPress container
   community.docker.docker_container:
     name: "{{ wordpress_container_name }}"
@@ -8,7 +13,7 @@
     published_ports:
       - "{{ wordpress_port }}:80"
     volumes:
-      - "{{ wp_volume }}:/var/www/html"
+      - "{{ wordpress_volume }}:/var/www/html"
     env:
       WORDPRESS_DB_HOST: "{{ wordpress_db_host }}:{{ wordpress_db_port }}"
       WORDPRESS_DB_USER: "{{ wordpress_db_user }}"
