@@ -18,7 +18,7 @@
       MARIADB_DATABASE: "{{ wordpress_db_name }}"
       MARIADB_USER: "{{ wordpress_db_user }}"
       MARIADB_PASSWORD: "{{ wordpress_db_password }}"
-      MARIADB_CHARSET: "{{ db_charset }}"
+      MARIADB_CHARSET: "{{ db_charset | default('utf8mb4') }}"
       MARIADB_COLLATE: "{{ db_collation }}"
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p{{ db_root_password }} || exit 1"]

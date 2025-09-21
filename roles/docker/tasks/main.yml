@@ -1,4 +1,4 @@
-- name: Find any Docker apt list files in sources.list.d (remote)
+- name: Remove any Docker apt list files in sources.list.d
   ansible.builtin.find:
     paths: /etc/apt/sources.list.d
     patterns: 'docker*.list*'
@@ -7,7 +7,7 @@
   failed_when: false
   tags: ['docker']
 
-- name: Remove found Docker apt list files (remote)
+- name: Remove found Docker apt list files
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
@@ -15,7 +15,7 @@
   when: docker_lists.files is defined
   tags: ['docker']
 
-- name: Remove any Docker lines from /etc/apt/sources.list (remote)
+- name: Remove any Docker lines from /etc/apt/sources.list
   ansible.builtin.replace:
     path: /etc/apt/sources.list
     regexp: '^\s*deb\s+.*download\.docker\.com.*$'
@@ -33,29 +33,15 @@
     update_cache: false
   tags: ['docker']
 
-- name: Ensure keyrings dir exists
-  ansible.builtin.file:
-    path: /etc/apt/keyrings
-    state: directory
-    mode: '0755'
-  tags: ['docker']
-
-- name: Download Docker GPG key (ascii)
-  ansible.builtin.get_url:
+- name: Install Docker apt key (module, no command)
+  ansible.builtin.apt_key:
     url: https://download.docker.com/linux/ubuntu/gpg
-    dest: /etc/apt/keyrings/docker.asc
-    mode: '0644'
+    state: present
   tags: ['docker']
 
-- name: Convert Docker key to gpg (idempotent)
-  ansible.builtin.command:
-    cmd: gpg --dearmor -o /etc/apt/keyrings/docker.gpg /etc/apt/keyrings/docker.asc
-    creates: /etc/apt/keyrings/docker.gpg
-  tags: ['docker']
-
-- name: Add Docker apt repository (with signed-by)
+- name: Add Docker apt repository (no signed-by)
   ansible.builtin.apt_repository:
-    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
     filename: docker
     state: present
   tags: ['docker']

@@ -19,8 +19,6 @@ db_primary_bind: "127.0.0.1:3306:3306"
 db_replica_bind: "127.0.0.1:3307:3306"
 
 # Хост БД для WordPress - имя контейнера в docker-сети
-db_host: "{{ db_primary_container }}"
-db_port: 3306
 
 # Схема данных WP
 wordpress_db_name: wpdb
@@ -37,3 +35,7 @@ mysql_login_port_primary: 3306
 mysql_login_host_replica: 127.0.0.1
 mysql_login_port_replica: 3307
 mysql_login_user: root
+db_volume: db_data
+db_container_name: wp-db
+db_host: wp-db-primary
+db_port: 3306

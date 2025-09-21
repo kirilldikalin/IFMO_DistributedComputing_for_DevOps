@@ -60,19 +60,19 @@
     login_user: "{{ db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
-- name: Get MASTER STATUS via module
-  community.mysql.mysql_query:
-    query: "SHOW MASTER STATUS"
+- name: Get PRIMARY status (idempotent)
+  community.mysql.mysql_replication:
+    mode: getprimary
     login_host: "{{ db_cluster_mysql_login_host_primary }}"
     login_port: "{{ db_cluster_mysql_login_port_primary }}"
     login_user: "{{ db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
   register: db_cluster_master_status
 
-- name: Set facts from MASTER STATUS
+- name: Set facts from PRIMARY STATUS
   ansible.builtin.set_fact:
-    db_cluster_master_log_file: "{{ db_cluster_master_status.query_result[0][0].File }}"
-    db_cluster_master_log_pos: "{{ db_cluster_master_status.query_result[0][0].Position | int }}"
+    db_cluster_master_log_file: "{{ db_cluster_master_status.File }}"
+    db_cluster_master_log_pos: "{{ db_cluster_master_status.Position }}"
 
 - name: Run MariaDB REPLICA
   community.docker.docker_container:
