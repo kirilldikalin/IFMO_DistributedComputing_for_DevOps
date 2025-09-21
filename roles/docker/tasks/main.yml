@@ -1,4 +1,4 @@
-- name: Ensure prerequisites packages are present (no cache refresh)
+- name: Ensure prerequisites packages are present
   ansible.builtin.apt:
     name:
       - ca-certificates
@@ -16,17 +16,11 @@
     mode: '0755'
   tags: ['docker']
 
-- name: Download Docker GPG key (ASCII)
-  ansible.builtin.get_url:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    dest: /etc/apt/keyrings/docker.asc
+- name: Install Docker GPG key (copy vendored file)
+  ansible.builtin.copy:
+    src: docker.gpg
+    dest: /etc/apt/keyrings/docker.gpg
     mode: '0644'
-  tags: ['docker']
-
-- name: Convert Docker key to gpg (idempotent)
-  ansible.builtin.command:
-    cmd: gpg --dearmor -o /etc/apt/keyrings/docker.gpg /etc/apt/keyrings/docker.asc
-    creates: /etc/apt/keyrings/docker.gpg
   tags: ['docker']
 
 - name: Add Docker apt repository (with signed-by)
@@ -36,7 +30,7 @@
     state: present
   tags: ['docker']
 
-- name: Apt update (refresh cache)
+- name: Apt update
   ansible.builtin.apt:
     update_cache: true
   tags: ['docker']
