@@ -29,7 +29,7 @@
       community.mysql.mysql_db:
         state: dump
         name: "{{ wordpress_db_name }}"
-        target: /tmp/wpdb_dump.sql
+        target: {{ db_migration_dump_path }}
         login_host: "{{ db_cluster_single_ip }}"
         login_port: 3306
         login_user: root
@@ -39,7 +39,7 @@
       community.mysql.mysql_db:
         state: import
         name: "{{ wordpress_db_name }}"
-        target: /tmp/wpdb_dump.sql
+        target: {{ db_migration_dump_path }}
         login_host: "{{ db_cluster_mysql_login_host_primary }}"
         login_port: "{{ db_cluster_mysql_login_port_primary }}"
         login_user: root
@@ -47,7 +47,7 @@
 
     - name: Remove dump
       ansible.builtin.file:
-        path: /tmp/wpdb_dump.sql
+        path: {{ db_migration_dump_path }}
         state: absent
 
     - name: Stop and remove legacy single DB

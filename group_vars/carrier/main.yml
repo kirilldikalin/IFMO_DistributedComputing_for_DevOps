@@ -47,3 +47,4 @@ wordpress_db_port: "{{ db_cluster_primary_port }}"
 db_cluster_mariadb_primary_extra_args: "--server-id=1 --log-bin=mysql-bin --binlog-format=ROW --skip-slave-start"
 db_cluster_mariadb_replica_extra_args: "--server-id=2 --relay-log=relay-bin --read-only=ON --skip-slave-start"
 db_remove_legacy_single: true
+db_migration_dump_path: /var/tmp/wpdb_dump.sql

@@ -16,11 +16,11 @@
     mode: '0755'
   tags: ['docker']
 
-- name: Install Docker GPG key (copy vendored file)
-  ansible.builtin.copy:
-    src: docker.gpg
-    dest: /etc/apt/keyrings/docker.gpg
-    mode: '0644'
+- name: Install Docker GPG key to keyring
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+    keyring: /etc/apt/keyrings/docker.gpg
   tags: ['docker']
 
 - name: Add Docker apt repository (with signed-by)
