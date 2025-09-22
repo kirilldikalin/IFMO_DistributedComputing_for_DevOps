@@ -1,0 +1,70 @@
+- name: Bootstrap WordPress schema once if DB is empty
+  hosts: carrier
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Ensure wp-app exists
+      community.docker.docker_container_info:
+        name: wp-app
+      register: wp_bootstrap_wp_app
+      failed_when: not (wp_bootstrap_wp_app.exists | default(false))
+      changed_when: false
+
+    - name: Derive /var/www/html mount source of wp-app
+      ansible.builtin.set_fact:
+        _wp_html_mount: >-
+          {{
+            (
+              (wp_bootstrap_wp_app.container.Mounts
+                | selectattr('Destination','equalto','/var/www/html')
+                | list | first).Name
+              | default(
+                  (wp_bootstrap_wp_app.container.Mounts
+                    | selectattr('Destination','equalto','/var/www/html')
+                    | list | first).Source,
+                  true
+                )
+            )
+          }}
+
+    - name: Fail if mount not found
+      ansible.builtin.assert:
+        that:
+          - _wp_html_mount is string
+          - _wp_html_mount | length > 0
+        fail_msg: "Не найден монт /var/www/html у контейнера wp-app"
+
+    - name: Check wp_options presence on PRIMARY
+      community.mysql.mysql_query:
+        login_host: "{{ db_cluster_mysql_login_host_primary }}"
+        login_port: "{{ db_cluster_mysql_login_port_primary }}"
+        login_user: root
+        login_password: "{{ db_root_password }}"
+        query: "SELECT COUNT(*) AS c FROM information_schema.tables WHERE table_schema='{{ wordpress_db_name }}' AND table_name='wp_options'"
+      register: _wpopt
+      changed_when: false
+
+    - name: Run wp-cli core install once
+      community.docker.docker_container:
+        name: wp-cli-once
+        image: wordpress:cli
+        auto_remove: true
+        detach: false
+        networks:
+          - name: "{{ docker_network_name }}"
+        volumes:
+          - "{{ _wp_html_mount }}:/var/www/html"
+        env:
+          WORDPRESS_DB_HOST: "{{ wordpress_db_host }}:{{ wordpress_db_port }}"
+          WORDPRESS_DB_USER: "{{ wordpress_db_user }}"
+          WORDPRESS_DB_PASSWORD: "{{ wordpress_db_password }}"
+          WORDPRESS_DB_NAME: "{{ wordpress_db_name }}"
+        command: >
+          wp core install
+          --url="{{ wp_bootstrap_url }}"
+          --title="{{ wp_bootstrap_title | default('WordPress') }}"
+          --admin_user="{{ wp_bootstrap_admin_user | default('wpadmin') }}"
+          --admin_password="{{ wp_bootstrap_admin_password | default('ChangeMe!123') }}"
+          --admin_email="{{ wp_bootstrap_admin_email | default('admin@example.com') }}"
+      when: (_wpopt.query_result[0][0].c | int) == 0
