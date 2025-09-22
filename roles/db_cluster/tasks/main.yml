@@ -79,6 +79,16 @@
   retries: 30
   delay: 2
 
+- name: Ensure WordPress DB exists on PRIMARY
+  community.mysql.mysql_db:
+    name: "{{ wordpress_db_name }}"
+    state: present
+    login_host: "{{ db_cluster_mysql_login_host_primary }}"
+    login_port: "{{ db_cluster_mysql_login_port_primary }}"
+    login_user: "{{ db_cluster_mysql_login_user }}"
+    login_password: "{{ db_root_password }}"
+
+
 - name: Ensure replication user on PRIMARY
   community.mysql.mysql_user:
     name: "{{ db_cluster_repl_user }}"
@@ -167,6 +177,14 @@
     login_user: "{{ db_cluster_mysql_login_user }}"
     login_password: "{{ db_root_password }}"
 
+- name: Ensure WordPress DB exists on REPLICA
+  community.mysql.mysql_db:
+    name: "{{ wordpress_db_name }}"
+    state: present
+    login_host: "{{ db_cluster_mysql_login_host_replica }}"
+    login_port: "{{ db_cluster_mysql_login_port_replica }}"
+    login_user: "{{ db_cluster_mysql_login_user }}"
+    login_password: "{{ db_root_password }}"
 - name: Configure replication on REPLICA (CHANGE MASTER TO)
   community.mysql.mysql_replication:
     mode: changeprimary
