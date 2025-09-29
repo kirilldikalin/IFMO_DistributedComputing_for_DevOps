@@ -3,21 +3,6 @@
     name: "{{ db_volume }}"
     state: present
 
-- name: Ensure secrets dir for MariaDB
-  ansible.builtin.file:
-    path: /opt/wpdb/secrets
-    state: directory
-    mode: '0700'
-
-- name: Write mysql_root.cnf secret
-  ansible.builtin.copy:
-    dest: /opt/wpdb/secrets/mysql_root.cnf
-    mode: '0600'
-    content: |
-      [client]
-      user=root
-      password={{ db_root_password }}
-
 - name: Run MariaDB container
   community.docker.docker_container:
     name: "{{ db_container_name }}"
@@ -28,16 +13,15 @@
       - name: "{{ docker_network_name }}"
     volumes:
       - "{{ db_volume }}:/var/lib/mysql"
-      - "/opt/wpdb/secrets/mysql_root.cnf:/run/secrets/mysql_root.cnf:ro"
     env:
       MARIADB_ROOT_PASSWORD: "{{ db_root_password }}"
       MARIADB_DATABASE: "{{ wordpress_db_name }}"
       MARIADB_USER: "{{ wordpress_db_user }}"
       MARIADB_PASSWORD: "{{ wordpress_db_password }}"
       MARIADB_CHARSET: "{{ db_charset | default('utf8mb4') }}"
-      MARIADB_COLLATE: "{{ db_collation | default('utf8mb4_unicode_ci') }}"
+      MARIADB_COLLATE: "{{ db_collation }}"
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin --defaults-extra-file=/run/secrets/mysql_root.cnf ping -h 127.0.0.1 || exit 1"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p{{ db_root_password }} || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

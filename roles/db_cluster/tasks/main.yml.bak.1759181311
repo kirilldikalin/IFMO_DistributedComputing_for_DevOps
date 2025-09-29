@@ -200,21 +200,29 @@
 - name: Grant remote root on PRIMARY
   community.docker.docker_container_exec:
     container: "{{ db_primary_container }}"
-    command: |
-      sh -lc 'mysql --defaults-extra-file=/run/secrets/mysql_root.cnf -e "
-        CREATE USER IF NOT EXISTS '''root'''@'''%''' IDENTIFIED BY '''{{ db_root_password }}''';
-        GRANT ALL PRIVILEGES ON *.* TO '''root'''@'''%''' WITH GRANT OPTION;
+    command:
+      - sh
+      - -lc
+      - |
+        mysql --defaults-extra-file=/run/secrets/mysql_root.cnf <<'SQL'
+        CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY '{{ db_root_password }}';
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
         FLUSH PRIVILEGES;
-      "'
+        SQL
+
 - name: Grant remote root on REPLICA
   community.docker.docker_container_exec:
     container: "{{ db_replica_container }}"
-    command: |
-      sh -lc 'mysql --defaults-extra-file=/run/secrets/mysql_root.cnf -e "
-        CREATE USER IF NOT EXISTS '''root'''@'''%''' IDENTIFIED BY '''{{ db_root_password }}''';
-        GRANT ALL PRIVILEGES ON *.* TO '''root'''@'''%''' WITH GRANT OPTION;
+    command:
+      - sh
+      - -lc
+      - |
+        mysql --defaults-extra-file=/run/secrets/mysql_root.cnf <<'SQL'
+        CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY '{{ db_root_password }}';
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
         FLUSH PRIVILEGES;
-      "'
+        SQL
+
 - name: Stop replication on REPLICA if running
   community.mysql.mysql_replication:
     mode: stopreplica

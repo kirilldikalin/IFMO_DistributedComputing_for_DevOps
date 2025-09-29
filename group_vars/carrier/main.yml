@@ -1,50 +1,77 @@
 docker_network_name: wpnet
 
 db_image: mariadb:10.11
+
+# Legacy single DB
 db_container_name: wp-db
 db_volume: db_data
 db_port: 3306
 db_charset: utf8mb4
+db_collation: utf8mb4_unicode_ci
 
+# WordPress
+wordpress_container_name: wordpress
 wordpress_port: 8080
 wordpress_db_user: wpuser
 wordpress_db_password: itmokirill
 wordpress_db_name: wpdb
-
 db_host: "{{ db_container_name }}"
 
+# Cluster containers
 db_cluster_primary_container_name: wp-db-primary
 db_cluster_replica_container_name: wp-db-replica
 
-db_cluster_mysql_login_user: root
-db_cluster_mysql_login_host_primary: 127.0.0.1
-db_cluster_mysql_login_port_primary: 3306
-db_cluster_mysql_login_host_replica: 127.0.0.1
-db_cluster_mysql_login_port_replica: 3307
+# Unified names used across roles
+db_primary_container: "{{ db_cluster_primary_container_name }}"
+db_replica_container: "{{ db_cluster_replica_container_name }}"
 
-db_root_password: "{{ vault_db_root_password }}"
-db_primary_volume: db_primary_data
-db_replica_volume: db_replica_data
-
-db_repl_user: repl
-db_repl_password: "{{ vault_db_cluster_repl_password }}"
-
-db_cluster_repl_user: "{{ db_repl_user }}"
-db_cluster_repl_password: "{{ db_repl_password }}"
-
-db_primary_container: wp-db-primary
-db_replica_container: wp-db-replica
-
+# Cluster ports and published bindings
 db_cluster_primary_port: 3306
 db_cluster_replica_port: 3307
-
 db_cluster_primary_bind: "{{ db_cluster_primary_port }}:3306"
 db_cluster_replica_bind: "{{ db_cluster_replica_port }}:3306"
 
+# WP указывает на PRIMARY
 wordpress_db_host: "{{ db_primary_container }}"
 wordpress_db_port: "{{ db_cluster_primary_port }}"
 
-db_cluster_mariadb_primary_extra_args: "--server-id=1 --log-bin=mysql-bin --binlog-format=ROW --skip-slave-start"
-db_cluster_mariadb_replica_extra_args: "--server-id=2 --relay-log=relay-bin --read-only=ON --skip-slave-start"
+# Cluster volumes
+db_primary_volume: db_primary_data
+db_replica_volume: db_replica_data
+
+# MySQL/MariaDB login with controller
+db_cluster_mysql_login_user: root
+db_cluster_mysql_login_host_primary: 127.0.0.1
+db_cluster_mysql_login_port_primary: "{{ db_cluster_primary_port }}"
+db_cluster_mysql_login_host_replica: 127.0.0.1
+db_cluster_mysql_login_port_replica: "{{ db_cluster_replica_port }}"
+
+# Compat для verify_replication.yml
+mysql_login_user: "{{ db_cluster_mysql_login_user }}"
+mysql_login_host_primary: "{{ db_cluster_mysql_login_host_primary }}"
+mysql_login_port_primary: "{{ db_cluster_mysql_login_port_primary }}"
+mysql_login_host_replica: "{{ db_cluster_mysql_login_host_replica }}"
+mysql_login_port_replica: "{{ db_cluster_mysql_login_port_replica }}"
+
+# MariaDB args для conf.d файлов
+db_cluster_mariadb_primary_extra_args:
+  - --server-id=1
+  - --log-bin=mysql-bin
+  - --binlog_format=ROW
+  - --innodb_flush_log_at_trx_commit=1
+  - --log-basename=primary
+  - --skip-slave-start
+
+db_cluster_mariadb_replica_extra_args:
+  - --server-id=2
+  - --relay-log=relay-bin
+  - --read_only=ON
+  - --log-basename=replica
+  - --skip-slave-start
+
+# Репликация, дефолты на случай отсутствия vault
+db_cluster_repl_user: repl
+db_cluster_repl_password: replpass123
+
+# Поведение миграции
 db_remove_legacy_single: true
-db_migration_dump_path: /var/tmp/wpdb_dump.sql
