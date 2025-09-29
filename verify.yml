@@ -23,13 +23,13 @@
     - name: Assert WP points to PRIMARY
       ansible.builtin.assert:
         that:
-          - "'{{ db_primary_container }}' in wp_db_host_env"
+          - "'{{ db_cluster_primary_container_name }}' in wp_db_host_env"
         fail_msg: "WP указывает не на мастер. WORDPRESS_DB_HOST={{ wp_db_host_env }}"
         success_msg: "WP указывает на мастер, WORDPRESS_DB_HOST={{ wp_db_host_env }}"
 
     - name: PRIMARY container healthy
       community.docker.docker_container_info:
-        name: "{{ db_primary_container }}"
+        name: "{{ db_cluster_primary_container_name }}"
       register: c_primary
 
     - name: Assert PRIMARY healthy
@@ -40,7 +40,7 @@
 
     - name: REPLICA container healthy
       community.docker.docker_container_info:
-        name: "{{ db_replica_container }}"
+        name: "{{ db_cluster_replica_container_name }}"
       register: c_replica
 
     - name: Assert REPLICA healthy

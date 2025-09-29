@@ -33,7 +33,7 @@
 
 - name: Run MySQL MASTER
   community.docker.docker_container:
-    name: "{{ db_cluster_primary_container_name }}"
+    name: "{{ db_primary_container }}"
     image: "{{ db_image }}"
     restart_policy: always
     networks:
@@ -48,70 +48,21 @@
       MYSQL_DATABASE: "{{ wp_db_name }}"
       MYSQL_USER: "{{ wp_db_user }}"
       MYSQL_PASSWORD: "{{ wp_db_password }}"
-
-- name: Wait MASTER tcp ready
-  ansible.builtin.wait_for:
-    host: "127.0.0.1"
-    port: "{{ db_cluster_primary_port | int }}"
-    delay: 2
-    timeout: 120
-
-- name: Check legacy DB container presence
-  community.docker.docker_container_info:
-    name: "{{ legacy_db_container_name }}"
-  register: db_cluster_legacy_info
-
-- name: Stop WordPress before legacy dump
-  community.docker.docker_container:
-    name: "{{ wordpress_container_name }}"
-    state: stopped
-  when: db_cluster_legacy_info.exists | default(false)
-  failed_when: false
-  register: db_cluster_stop_wp
-
-- name: Ensure backup dir
-  ansible.builtin.file:
-    path: /opt/wordpress/backup
-    state: directory
-    mode: '0755'
-  when: db_cluster_legacy_info.exists | default(false)
-
-- name: Dump legacy DB to host file
-  ansible.builtin.shell: |
-    set -e
-    docker exec -e MYSQL_PWD={{ mysql_root_password }} {{ legacy_db_container_name }} sh -lc \
-      'mysqldump -uroot --databases {{ wp_db_name }}' > /opt/wordpress/backup/wp.sql
-  args:
-    creates: /opt/wordpress/backup/wp.sql
-  when: db_cluster_legacy_info.exists | default(false)
-
-- name: Check if WordPress is already initialized on MASTER
-  community.mysql.mysql_query:
-    login_user: root
-    login_password: "{{ mysql_root_password }}"
-    login_host: 127.0.0.1
-    login_port: "{{ db_cluster_primary_port }}"
-    query: "SELECT COUNT(*) AS c FROM information_schema.tables WHERE table_schema='{{ wp_db_name }}' AND table_name='wp_options'"
-  register: db_cluster_wp_options_count
-  when: db_cluster_legacy_info.exists | default(false)
-
-- name: Import dump into MASTER (only if empty)
-  community.mysql.mysql_db:
-    state: import
-    name: "{{ wp_db_name }}"
-    target: /opt/wordpress/backup/wp.sql
-    login_user: root
-    login_password: "{{ mysql_root_password }}"
-    login_host: 127.0.0.1
-    login_port: "{{ db_cluster_primary_port }}"
-  when:
-    - db_cluster_legacy_info.exists | default(false)
-    - (db_cluster_wp_options_count.query_result[0].c | default(0) | int) == 0
-- name: Start WordPress after migration
-  community.docker.docker_container:
-    name: "{{ wordpress_container_name }}"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin --defaults-extra-file=/run/secrets/mysql_root.cnf ping -h 127.0.0.1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     state: started
-  when: db_cluster_legacy_info.exists | default(false)
+
+- name: Wait MASTER healthy
+  community.docker.docker_container_info:
+    name: "{{ db_primary_container }}"
+  register: db_cluster_master_info
+  until: db_cluster_master_info.container.State.Health.Status is defined and db_cluster_master_info.container.State.Health.Status == "healthy"
+  retries: 30
+  delay: 2
 
 - name: Ensure replication user on MASTER
   community.mysql.mysql_user:
@@ -136,7 +87,7 @@
 
 - name: Run MySQL REPLICA
   community.docker.docker_container:
-    name: "{{ db_cluster_replica_container_name }}"
+    name: "{{ db_replica_container }}"
     image: "{{ db_image }}"
     restart_policy: always
     networks:
@@ -148,13 +99,21 @@
       - "/opt/wordpress/config/replica.cnf:/etc/mysql/conf.d/config.cnf:ro"
     env:
       MYSQL_ROOT_PASSWORD: "{{ mysql_root_password }}"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin --defaults-extra-file=/run/secrets/mysql_root.cnf ping -h 127.0.0.1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    state: started
 
-- name: Wait REPLICA tcp ready
-  ansible.builtin.wait_for:
-    host: "127.0.0.1"
-    port: "{{ db_cluster_replica_port | int }}"
-    delay: 2
-    timeout: 120
+- name: Wait REPLICA healthy
+  community.docker.docker_container_info:
+    name: "{{ db_replica_container }}"
+  register: db_cluster_replica_info
+  until: db_cluster_replica_info.container.State.Health.Status is defined and db_cluster_replica_info.container.State.Health.Status == "healthy"
+  retries: 30
+  delay: 2
 
 # Останавливаем на всякий случай, если было что-то настроено
 - name: Stop replication on REPLICA
@@ -166,18 +125,11 @@
     login_port: "{{ db_cluster_replica_port }}"
   failed_when: false
 
-- name: Reset replication on REPLICA (full)
-  community.mysql.mysql_replication:
-    mode: resetreplicaall
-    login_user: root
-    login_password: "{{ mysql_root_password }}"
-    login_host: 127.0.0.1
-    login_port: "{{ db_cluster_replica_port }}"
 # Настраиваем CHANGE MASTER с GTID авто-позицией
 - name: Configure REPLICA to MASTER (GTID auto-position)
   community.mysql.mysql_replication:
-    mode: changeprimary
-    primary_host: "{{ db_cluster_primary_container_name }}"
+    mode: changemaster
+    primary_host: "{{ db_primary_container }}"
     primary_port: 3306
     primary_user: "{{ db_cluster_repl_user }}"
     primary_password: "{{ db_cluster_repl_password }}"

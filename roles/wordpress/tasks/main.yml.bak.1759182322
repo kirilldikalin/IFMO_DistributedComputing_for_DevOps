@@ -8,7 +8,6 @@
     name: "{{ wordpress_container_name }}"
     image: "{{ wordpress_image }}"
     restart_policy: always
-    recreate: true
     networks:
       - name: "{{ docker_network_name }}"
     published_ports:

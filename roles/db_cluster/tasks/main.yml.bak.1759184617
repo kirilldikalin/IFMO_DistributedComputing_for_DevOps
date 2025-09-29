@@ -33,7 +33,7 @@
 
 - name: Run MySQL MASTER
   community.docker.docker_container:
-    name: "{{ db_cluster_primary_container_name }}"
+    name: "{{ db_primary_container }}"
     image: "{{ db_image }}"
     restart_policy: always
     networks:
@@ -85,28 +85,12 @@
     creates: /opt/wordpress/backup/wp.sql
   when: db_cluster_legacy_info.exists | default(false)
 
-- name: Check if WordPress is already initialized on MASTER
-  community.mysql.mysql_query:
-    login_user: root
-    login_password: "{{ mysql_root_password }}"
-    login_host: 127.0.0.1
-    login_port: "{{ db_cluster_primary_port }}"
-    query: "SELECT COUNT(*) AS c FROM information_schema.tables WHERE table_schema='{{ wp_db_name }}' AND table_name='wp_options'"
-  register: db_cluster_wp_options_count
+- name: Import dump into MASTER
+  ansible.builtin.shell: |
+    set -e
+    MYSQL_PWD={{ mysql_root_password }} mysql -h 127.0.0.1 -P {{ db_cluster_primary_port }} -uroot < /opt/wordpress/backup/wp.sql
   when: db_cluster_legacy_info.exists | default(false)
 
-- name: Import dump into MASTER (only if empty)
-  community.mysql.mysql_db:
-    state: import
-    name: "{{ wp_db_name }}"
-    target: /opt/wordpress/backup/wp.sql
-    login_user: root
-    login_password: "{{ mysql_root_password }}"
-    login_host: 127.0.0.1
-    login_port: "{{ db_cluster_primary_port }}"
-  when:
-    - db_cluster_legacy_info.exists | default(false)
-    - (db_cluster_wp_options_count.query_result[0].c | default(0) | int) == 0
 - name: Start WordPress after migration
   community.docker.docker_container:
     name: "{{ wordpress_container_name }}"
@@ -136,7 +120,7 @@
 
 - name: Run MySQL REPLICA
   community.docker.docker_container:
-    name: "{{ db_cluster_replica_container_name }}"
+    name: "{{ db_replica_container }}"
     image: "{{ db_image }}"
     restart_policy: always
     networks:
@@ -177,7 +161,7 @@
 - name: Configure REPLICA to MASTER (GTID auto-position)
   community.mysql.mysql_replication:
     mode: changeprimary
-    primary_host: "{{ db_cluster_primary_container_name }}"
+    primary_host: "{{ db_primary_container }}"
     primary_port: 3306
     primary_user: "{{ db_cluster_repl_user }}"
     primary_password: "{{ db_cluster_repl_password }}"
