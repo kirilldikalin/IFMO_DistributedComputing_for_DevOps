@@ -1,9 +1,4 @@
-- name: Ensure DB volume
-  community.docker.docker_volume:
-    name: "{{ db_volume }}"
-    state: present
-
-- name: Ensure secrets dir for MariaDB
+- name: Ensure secrets dir for single DB
   ansible.builtin.file:
     path: /opt/wpdb/secrets
     state: directory
@@ -18,7 +13,12 @@
       user=root
       password={{ db_root_password }}
 
-- name: Run MariaDB container
+- name: Ensure single DB volume
+  community.docker.docker_volume:
+    name: "{{ db_volume }}"
+    state: present
+
+- name: Run single MariaDB container
   community.docker.docker_container:
     name: "{{ db_container_name }}"
     image: "{{ db_image }}"
@@ -36,9 +36,13 @@
       MARIADB_PASSWORD: "{{ wordpress_db_password }}"
       MARIADB_CHARSET: "{{ db_charset | default('utf8mb4') }}"
       MARIADB_COLLATE: "{{ db_collation | default('utf8mb4_unicode_ci') }}"
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin --defaults-extra-file=/run/secrets/mysql_root.cnf ping -h 127.0.0.1 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+
+- name: Wait single DB ready
+  community.docker.docker_container_exec:
+    container: "{{ db_container_name }}"
+    command: sh -lc "mysqladmin --defaults-extra-file=/run/secrets/mysql_root.cnf ping -h 127.0.0.1"
+  register: db_single_ping
+  retries: 30
+  delay: 2
+  until: db_single_ping.rc == 0
+  changed_when: false

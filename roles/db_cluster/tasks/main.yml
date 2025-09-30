@@ -1,6 +1,8 @@
-- name: Ensure PyMySQL for MySQL modules
+- name: Ensure MySQL client dependencies
   ansible.builtin.apt:
-    name: python3-pymysql
+    name:
+      - python3-pymysql
+      - default-mysql-client
     state: present
     update_cache: true
 
@@ -113,6 +115,13 @@
     state: started
   when: db_cluster_legacy_info.exists | default(false)
 
+- name: Ensure legacy single DB container absent
+  community.docker.docker_container:
+    name: "{{ legacy_db_container_name }}"
+    state: absent
+    force_kill: true
+  when: db_cluster_legacy_info.exists | default(false)
+
 - name: Ensure replication user on MASTER
   community.mysql.mysql_user:
     name: "{{ db_cluster_repl_user }}"
@@ -156,7 +165,6 @@
     delay: 2
     timeout: 120
 
-# Останавливаем на всякий случай, если было что-то настроено
 - name: Stop replication on REPLICA
   community.mysql.mysql_replication:
     mode: stopreplica
@@ -173,7 +181,6 @@
     login_password: "{{ mysql_root_password }}"
     login_host: 127.0.0.1
     login_port: "{{ db_cluster_replica_port }}"
-# Настраиваем CHANGE MASTER с GTID авто-позицией
 - name: Configure REPLICA to MASTER (GTID auto-position)
   community.mysql.mysql_replication:
     mode: changeprimary

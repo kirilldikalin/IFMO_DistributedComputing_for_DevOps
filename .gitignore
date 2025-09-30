@@ -1,3 +1,23 @@
-.DS_Store
+# backups
 *.bak
+*.bak.*
+*~
+*.swp
+*.swo
+
+# python
+__pycache__/
+*.pyc
+
+# macos
+.DS_Store
+
+# vscode and idea
+.vscode/
+.idea/
+
+# venv
+.venv/
+venv/
 group_vars/*/secrets.yml
+group_vars/_vault_disabled/
