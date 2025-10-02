@@ -1,0 +1,69 @@
+---
+- name: Lab1 - Deploy WordPress with single DB
+  hosts: wordpress
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Ensure Python3 is present
+      ansible.builtin.raw: test -e /usr/bin/python3 || (apt update && apt install -y python3)
+      changed_when: false
+      become: true
+
+  roles:
+    - role: docker
+    - role: stack
+
+  tasks:
+    - name: Дождаться запуска контейнера db_master
+      community.docker.docker_container_info:
+        name: db_master
+      register: db_master_info
+      retries: 30
+      delay: 10
+      until: >-
+        db_master_info is succeeded and
+        db_master_info.container is defined and
+        db_master_info.container.State is defined and
+        db_master_info.container.State.Status == 'running' and
+        (
+          db_master_info.container.State.Health is not defined or
+          db_master_info.container.State.Health.Status == 'healthy'
+        )
+      failed_when: >-
+        db_master_info.container is defined and
+        db_master_info.container.State is defined and
+        db_master_info.container.State.Status == 'exited'
+      become: true
+
+    - name: Ждать открытия порта мастера
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ mysql_master_port_host }}"
+        delay: 5
+        timeout: 300
+
+    - name: Проверить готовность MySQL на мастере
+      community.mysql.mysql_query:
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_master_port_host }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        query: "SELECT 1;"
+      register: ping_result
+      retries: 30
+      delay: 10
+      until: ping_result is succeeded
+      changed_when: false
+
+    - name: Проверить доступность WordPress HTTP
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ wp_http_port }}/"
+        method: GET
+        return_content: no
+        status_code: 200,301,302
+        timeout: 10
+      register: wordpress_status
+      retries: 15
+      delay: 10
+      until: wordpress_status.status in [200, 301, 302]
+      changed_when: false

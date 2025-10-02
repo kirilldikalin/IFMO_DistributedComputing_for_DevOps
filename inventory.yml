@@ -1,9 +1,0 @@
-all:
-  children:
-    carrier:
-      hosts:
-        yc-wp-1:
-          ansible_host: 51.250.25.239
-          ansible_user: distributedadmin
-          ansible_ssh_private_key_file: ~/.ssh/itmo/itmo_key
-          ansible_python_interpreter: /usr/bin/python3

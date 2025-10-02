@@ -1,0 +1,35 @@
+---
+- name: Verify - Replication smoke
+  hosts: wordpress
+  become: true
+  gather_facts: no
+
+  vars:
+    test_table: "repcheck"
+  tasks:
+    - name: Insert row on master
+      community.mysql.mysql_query:
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_master_port_host }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        query:
+          - "CREATE TABLE IF NOT EXISTS {{ mysql_db_name }}.{{ test_table }}(id INT PRIMARY KEY, note VARCHAR(50));"
+          - "INSERT INTO {{ mysql_db_name }}.{{ test_table }} VALUES (1,'ok') ON DUPLICATE KEY UPDATE note='ok';"
+
+    - name: Read row from slave
+      community.mysql.mysql_query:
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_slave_port_host }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        query:
+          - "SELECT note FROM {{ mysql_db_name }}.{{ test_table }} WHERE id=1;"
+      register: slave_read
+
+    - name: Assert replica has the row
+      ansible.builtin.assert:
+        that:
+          - slave_read.rowcount[0] == 1
+        success_msg: "OK репликация подтверждена smoke-тестом"
+        fail_msg: "Записи нет на слейве, репликация не работает"

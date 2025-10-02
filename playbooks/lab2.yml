@@ -1,0 +1,110 @@
+---
+- name: Lab2 - Configure MySQL replication
+  hosts: wordpress
+  gather_facts: no
+
+  tasks:
+    - name: Запустить контейнер db_slave
+      community.docker.docker_compose_v2:
+        project_src: "{{ project_dir }}"
+        state: present
+        services:
+          - db_slave
+      become: true
+
+    - name: Ждать порт слейва
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ mysql_slave_port_host }}"
+        delay: 5
+        timeout: 300
+
+    - name: Проверить готовность MySQL на слейве
+      community.mysql.mysql_query:
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_slave_port_host }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        query: "SELECT 1;"
+      register: ping_slave
+      retries: 30
+      delay: 10
+      until: ping_slave is succeeded
+      changed_when: false
+
+    - name: Создать пользователя репликации на мастере
+      community.mysql.mysql_user:
+        name: "{{ mysql_repl_user }}"
+        host: "%"
+        password: "{{ mysql_repl_password }}"
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_master_port_host }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        priv: "*.*:REPLICATION SLAVE,REPLICATION CLIENT"
+        state: present
+
+    - name: Получить статус мастера
+      community.mysql.mysql_replication:
+        mode: getprimary
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_master_port_host }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+      register: master_status
+
+    - name: Остановить репликацию на слейве на всякий случай
+      community.mysql.mysql_replication:
+        mode: stopreplica
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_slave_port_host }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+      register: stop_replication
+      failed_when: false
+
+    - name: Настроить слейва на мастера
+      community.mysql.mysql_replication:
+        mode: changeprimary
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_slave_port_host }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        primary_host: "db_master"
+        primary_user: "{{ mysql_repl_user }}"
+        primary_password: "{{ mysql_repl_password }}"
+        primary_port: 3306
+        primary_log_file: "{{ master_status.Primary_Log_File | default(master_status.File) }}"
+        primary_log_pos: "{{ master_status.Exec_Master_Log_Pos | default(master_status.Position) }}"
+        primary_connect_retry: "{{ mysql_repl_connect_retry }}"
+
+    - name: Запустить репликацию на слейве
+      community.mysql.mysql_replication:
+        mode: startreplica
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_slave_port_host }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+
+    - name: Проверить статус репликации
+      community.mysql.mysql_replication:
+        mode: getreplica
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_slave_port_host }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+      register: slave_status
+      retries: 15
+      delay: 5
+      until:
+        - (slave_status.Replica_IO_Running | default(slave_status.Slave_IO_Running | default('No'))) == "Yes"
+        - (slave_status.Replica_SQL_Running | default(slave_status.Slave_SQL_Running | default('No'))) == "Yes"
+      changed_when: false
+
+    - name: Проверка что потоки репликации запущены
+      ansible.builtin.assert:
+        that:
+          - (slave_status.Replica_IO_Running | default(slave_status.Slave_IO_Running | default('No'))) == "Yes"
+          - (slave_status.Replica_SQL_Running | default(slave_status.Slave_SQL_Running | default('No'))) == "Yes"
+        fail_msg: "Репликация не запущена, проверьте slave_status"
+        success_msg: "OK репликация работает"

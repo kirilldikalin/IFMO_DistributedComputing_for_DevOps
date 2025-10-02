@@ -1,9 +1,7 @@
 ---
-# .ansible-lint
-
-exclude_paths:
-  - .github/workflows/
-
-parseable: true
-use_default_rules: true
-verbosity: 1
+skip_list:
+  - var-naming
+  - name[template]
+  - yaml
+warn_list:
+  - experimental

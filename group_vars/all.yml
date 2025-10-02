@@ -1,0 +1,18 @@
+---
+project_dir: /opt/wordpress
+project_name: wpstack
+wp_http_port: 8080
+
+mysql_image: "mysql:5.7"
+mysql_root_password: "rootpass123"
+mysql_db_name: "wordpress"
+mysql_user: "wp_user"
+mysql_password: "wp_pass123"
+mysql_repl_user: "repl_user"
+mysql_repl_password: "repl_pass123"
+mysql_repl_connect_retry: 5
+
+wordpress_image: "wordpress:6.5.5-php8.1-apache"
+
+mysql_master_port_host: 3306
+mysql_slave_port_host: 3307

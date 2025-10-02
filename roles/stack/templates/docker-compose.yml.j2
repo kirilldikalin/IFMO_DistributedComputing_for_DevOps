@@ -1,0 +1,82 @@
+version: "3.9"
+
+services:
+  db_master:
+    image: "{{ mysql_image }}"
+    container_name: db_master
+    restart: always
+    command: [
+      "--server-id=1",
+      "--log-bin=mysql-bin",
+      "--binlog-format=ROW",
+      "--gtid-mode=OFF",
+      "--enforce-gtid-consistency=OFF"
+    ]
+    environment:
+      MYSQL_ROOT_PASSWORD: "{{ mysql_root_password }}"
+      MYSQL_DATABASE: "{{ mysql_db_name }}"
+      MYSQL_USER: "{{ mysql_user }}"
+      MYSQL_PASSWORD: "{{ mysql_password }}"
+    volumes:
+      - master_data:/var/lib/mysql
+    networks:
+      - wp_net
+    ports:
+      - "127.0.0.1:{{ mysql_master_port_host }}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p{{ mysql_root_password }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  db_slave:
+    image: "{{ mysql_image }}"
+    container_name: db_slave
+    restart: always
+    command: [
+      "--server-id=2",
+      "--relay-log=relay-bin",
+      "--read-only=ON",
+      "--binlog-format=ROW"
+    ]
+    environment:
+      MYSQL_ROOT_PASSWORD: "{{ mysql_root_password }}"
+      MYSQL_DATABASE: "{{ mysql_db_name }}"
+      MYSQL_USER: "{{ mysql_user }}"
+      MYSQL_PASSWORD: "{{ mysql_password }}"
+    volumes:
+      - slave_data:/var/lib/mysql
+    networks:
+      - wp_net
+    ports:
+      - "127.0.0.1:{{ mysql_slave_port_host }}:3306"
+    depends_on:
+      - db_master
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p{{ mysql_root_password }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+
+  wordpress:
+    image: "{{ wordpress_image }}"
+    container_name: wordpress
+    restart: always
+    depends_on:
+      - db_master
+    environment:
+      WORDPRESS_DB_HOST: "db_master:3306"
+      WORDPRESS_DB_USER: "{{ mysql_user }}"
+      WORDPRESS_DB_PASSWORD: "{{ mysql_password }}"
+      WORDPRESS_DB_NAME: "{{ mysql_db_name }}"
+    ports:
+      - "0.0.0.0:{{ wp_http_port }}:80"
+    networks:
+      - wp_net
+
+networks:
+  wp_net:
+
+volumes:
+  master_data:
+  slave_data:

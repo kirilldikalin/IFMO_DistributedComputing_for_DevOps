@@ -1,0 +1,19 @@
+---
+- name: Verify - WordPress availability
+  hosts: wordpress
+  gather_facts: no
+
+  tasks:
+    - name: WP returns HTTP 200
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ wp_http_port }}/"
+        method: GET
+        status_code: 200,301,302
+
+    - name: Docker services up
+      community.docker.docker_compose_v2:
+        project_src: "{{ project_dir }}"
+        state: present
+      register: compose_state
+      changed_when: false
+      become: true

@@ -1,0 +1,37 @@
+---
+- name: Создать проектную директорию
+  ansible.builtin.file:
+    path: "{{ project_dir }}"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Скопировать docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ project_dir }}/docker-compose.yml"
+    mode: '0644'
+  become: true
+
+- name: Остановить предыдущий стек (если есть)
+  community.docker.docker_compose_v2:
+    project_src: "{{ project_dir }}"
+    state: absent
+    remove_volumes: true
+  become: true
+  failed_when: false
+
+- name: Pull образов
+  community.docker.docker_compose_v2:
+    project_src: "{{ project_dir }}"
+    pull: always
+  become: true
+
+- name: Поднять сервисы master и wordpress - этап 1
+  community.docker.docker_compose_v2:
+    project_src: "{{ project_dir }}"
+    state: present
+    services:
+      - db_master
+      - wordpress
+  become: true
