@@ -16,13 +16,16 @@ lab1:
 lab2:
 	ansible-playbook -i inventory.ini playbooks/lab2.yml
 
+lab3:
+	ansible-playbook -i inventory.ini playbooks/lab3.yml
+
 verify:
 	ansible-playbook -i inventory.ini playbooks/verify.yml
 
 verify-replication:
 	ansible-playbook -i inventory.ini playbooks/verify_replication.yml
 
-run-all: lint lab1 lab2 verify verify-replication
+run-all: lint lab1 lab2 lab3 verify verify-replication
 
 down:
 	-ssh $$(awk '/wordpress/{print $$1}' inventory.ini | head -1) 'cd /opt/wordpress && docker compose down -v' || true

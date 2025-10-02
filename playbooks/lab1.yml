@@ -67,3 +67,15 @@
       delay: 10
       until: wordpress_status.status in [200, 301, 302]
       changed_when: false
+
+    - name: Убедиться, что слейв не запущен
+      community.docker.docker_container_info:
+        name: db_slave
+      register: db_slave_info
+      become: true
+      failed_when: >-
+        db_slave_info.exists | default(false) and
+        db_slave_info.container is defined and
+        db_slave_info.container.State is defined and
+        db_slave_info.container.State.Status == 'running'
+      changed_when: false

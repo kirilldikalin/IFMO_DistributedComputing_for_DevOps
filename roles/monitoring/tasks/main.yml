@@ -1,0 +1,59 @@
+---
+- name: Создать директории конфигурации мониторинга
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  become: true
+  loop:
+    - "{{ project_dir }}/monitoring"
+    - "{{ project_dir }}/monitoring/prometheus"
+    - "{{ project_dir }}/monitoring/grafana"
+    - "{{ project_dir }}/monitoring/grafana/provisioning"
+    - "{{ project_dir }}/monitoring/grafana/provisioning/datasources"
+    - "{{ project_dir }}/monitoring/grafana/provisioning/dashboards"
+    - "{{ project_dir }}/monitoring/grafana/dashboards"
+
+- name: Скопировать конфигурацию Prometheus
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ project_dir }}/monitoring/prometheus/prometheus.yml"
+    mode: '0644'
+  become: true
+
+- name: Скопировать datasource для Grafana
+  ansible.builtin.template:
+    src: grafana/provisioning/datasources/datasource.yml.j2
+    dest: "{{ project_dir }}/monitoring/grafana/provisioning/datasources/datasource.yml"
+    mode: '0644'
+  become: true
+
+- name: Скопировать описание дашбордов Grafana
+  ansible.builtin.template:
+    src: grafana/provisioning/dashboards/dashboards.yml.j2
+    dest: "{{ project_dir }}/monitoring/grafana/provisioning/dashboards/dashboards.yml"
+    mode: '0644'
+  become: true
+
+- name: Скопировать дашборд репликации MySQL
+  ansible.builtin.template:
+    src: grafana/dashboards/mysql_replication.json.j2
+    dest: "{{ project_dir }}/monitoring/grafana/dashboards/mysql_replication.json"
+    mode: '0644'
+  become: true
+
+- name: Создать конфиги mysqld_exporter
+  ansible.builtin.template:
+    src: mysqld_exporter.cnf.j2
+    dest: "{{ project_dir }}/monitoring/{{ item.name }}"
+    mode: '0644'
+  become: true
+  loop:
+    - { name: mysqld_exporter_master.cnf, host: db_master, port: 3306 }
+    - { name: mysqld_exporter_slave.cnf, host: db_slave, port: 3306 }
+  when: item.host != 'db_slave' or enable_replication | default(true) | bool
+  loop_control:
+    label: "{{ item.name }}"
+  vars:
+    exporter_host: "{{ item.host }}"
+    exporter_port: "{{ item.port }}"

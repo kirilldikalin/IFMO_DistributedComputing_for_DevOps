@@ -6,6 +6,7 @@ make bootstrap-local
 make lint
 make lab1
 make lab2
+make lab3
 make verify
 make verify-replication
 ```
@@ -15,17 +16,21 @@ make verify-replication
 Входные точки
 - `playbooks/lab1.yml` деплой WordPress и master БД
 - `playbooks/lab2.yml` запуск slave и настройка репликации
+- `playbooks/lab3.yml` подключение мониторинга (Prometheus + Grafana + mysqld_exporter)
 - `playbooks/verify.yml` smoke по HTTP и состоянию compose
 - `playbooks/verify_replication.yml` smoke записи и чтения со slave
 
 Проверки всего и вся:
 
 ```bash
-dikalinkirill@compute-vm-distributed-computing-test:~$ cd /opt/wordpress
-dikalinkirill@compute-vm-distributed-computing-test:/opt/wordpress$ ROOT_PASS=$(python3 -c "import yaml;print(yaml.safe_load(open('/opt/wordpress/group_vars/all.yml'))['mysql_root_password'])")
-dikalinkirill@compute-vm-distributed-computing-test:/opt/wordpress$ sudo docker compose exec -T db_slave \
+ssh -i ~/.ssh/itmo/itmo_key dikalinkirill@89.169.182.147 
+cd /opt/wordpress
+ROOT_PASS=$(python3 -c "import yaml;print(yaml.safe_load(open('/opt/wordpress/group_vars/all.yml'))['mysql_root_password'])")
+sudo docker compose exec -T db_slave \
   mysql -uroot -p"${ROOT_PASS}" \
   -e "SHOW SLAVE STATUS\G"
+
+```
 WARN[0000] /opt/wordpress/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
 mysql: [Warning] Using a password on the command line interface can be insecure.
 *************************** 1. row ***************************
@@ -89,20 +94,30 @@ Master_SSL_Verify_Server_Cert: No
 ```
 
 ```bash
-dikalinkirill@compute-vm-distributed-computing-test:/opt/wordpress$ sudo docker compose exec -T db_master \
+sudo docker compose exec -T db_master \
   mysql -uroot -p"${ROOT_PASS}" \
   -e "CREATE TABLE IF NOT EXISTS wordpress.test_table (id INT PRIMARY KEY, ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
       INSERT INTO wordpress.test_table(id) VALUES (1)
       ON DUPLICATE KEY UPDATE ts = NOW();"
-WARN[0000] /opt/wordpress/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
-mysql: [Warning] Using a password on the command line interface can be insecure.
+```
 
-
-dikalinkirill@compute-vm-distributed-computing-test:/opt/wordpress$ sudo docker compose exec -T db_slave \
+```bash
+sudo docker compose exec -T db_slave \
   mysql -uroot -p"${ROOT_PASS}" \
   -e "SELECT * FROM wordpress.test_table WHERE id = 1;"
+```
+
+```
 WARN[0000] /opt/wordpress/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
 mysql: [Warning] Using a password on the command line interface can be insecure.
 id      ts
-1       2025-10-02 15:15:35
+1       2025-10-02 19:17:51
 ```
+
+Мониторинг из домашнего задания 3 доступен после `make lab3`.
+- Prometheus тут `http://<host>:{{ prometheus_port }}`
+- Grafana тут `http://<host>:{{ grafana_port }}` (логин/пароль `{{ grafana_admin_user }}` / `{{ grafana_admin_password }}`) в all.yml, преднастроил дашборд `MySQL Replication`
+
+
+![alt text](графана.png)
+![alt text](прометеус.png)

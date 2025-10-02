@@ -3,6 +3,18 @@
   hosts: wordpress
   gather_facts: no
 
+  pre_tasks:
+    - name: Обновить docker-compose для репликации
+      ansible.builtin.include_role:
+        name: stack
+      vars:
+        enable_replication: true
+        stack_reset: false
+        stack_pull: false
+        stack_start_services:
+          - db_master
+          - wordpress
+
   tasks:
     - name: Запустить контейнер db_slave
       community.docker.docker_compose_v2:

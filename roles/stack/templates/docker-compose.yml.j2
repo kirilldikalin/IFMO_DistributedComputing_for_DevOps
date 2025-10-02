@@ -29,6 +29,7 @@ services:
       timeout: 5s
       retries: 30
 
+{% if enable_replication | bool %}
   db_slave:
     image: "{{ mysql_image }}"
     container_name: db_slave
@@ -58,6 +59,7 @@ services:
       timeout: 5s
       retries: 60
 
+{% endif %}
   wordpress:
     image: "{{ wordpress_image }}"
     container_name: wordpress
@@ -74,9 +76,90 @@ services:
     networks:
       - wp_net
 
+{% if enable_monitoring | bool %}
+  mysqld_exporter_master:
+    image: prom/mysqld-exporter:latest
+    container_name: mysqld_exporter_master
+    restart: always
+    command:
+      - "--config.my-cnf=/etc/mysqld_exporter/.my.cnf"
+      - "--collect.global_status"
+      - "--collect.slave_status"
+    volumes:
+      - "{{ project_dir }}/monitoring/mysqld_exporter_master.cnf:/etc/mysqld_exporter/.my.cnf:ro"
+    networks:
+      - wp_net
+    depends_on:
+      - db_master
+
+{%   if enable_replication | bool %}
+  mysqld_exporter_slave:
+    image: prom/mysqld-exporter:latest
+    container_name: mysqld_exporter_slave
+    restart: always
+    command:
+      - "--config.my-cnf=/etc/mysqld_exporter/.my.cnf"
+      - "--collect.global_status"
+      - "--collect.slave_status"
+    volumes:
+      - "{{ project_dir }}/monitoring/mysqld_exporter_slave.cnf:/etc/mysqld_exporter/.my.cnf:ro"
+    networks:
+      - wp_net
+    depends_on:
+      - db_slave
+
+{%   endif %}
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time={{ prometheus_retention }}"
+    volumes:
+      - "{{ project_dir }}/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - prometheus_data:/prometheus
+    ports:
+      - "0.0.0.0:{{ prometheus_port }}:9090"
+    networks:
+      - wp_net
+    depends_on:
+      - mysqld_exporter_master
+{%   if enable_replication | bool %}
+      - mysqld_exporter_slave
+{%   endif %}
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_USER: "{{ grafana_admin_user }}"
+      GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_admin_password }}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "0.0.0.0:{{ grafana_port }}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - "{{ project_dir }}/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro"
+      - "{{ project_dir }}/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro"
+      - "{{ project_dir }}/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro"
+    networks:
+      - wp_net
+    depends_on:
+      - prometheus
+
+{% endif %}
 networks:
   wp_net:
 
 volumes:
   master_data:
+{% if enable_replication | bool %}
   slave_data:
+{% endif %}
+{% if enable_monitoring | bool %}
+  prometheus_data:
+  grafana_data:
+{% endif %}

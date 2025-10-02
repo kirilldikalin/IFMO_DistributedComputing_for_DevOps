@@ -1,0 +1,8 @@
+---
+stack_reset: true
+stack_pull: true
+stack_start_services:
+  - db_master
+  - wordpress
+enable_replication: false
+enable_monitoring: false

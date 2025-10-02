@@ -1,0 +1,76 @@
+---
+- name: Lab3 - Deploy monitoring for MySQL replication
+  hosts: wordpress
+  gather_facts: no
+
+  pre_tasks:
+    - name: Подготовить docker-compose для мониторинга
+      ansible.builtin.include_role:
+        name: stack
+      vars:
+        enable_replication: true
+        enable_monitoring: true
+        stack_reset: false
+        stack_pull: false
+        stack_start_services: []
+
+  roles:
+    - role: monitoring
+
+  tasks:
+    - name: Создать пользователя для mysqld_exporter
+      community.mysql.mysql_user:
+        name: "{{ mysql_exporter_user }}"
+        host: "%"
+        password: "{{ mysql_exporter_password }}"
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_master_port_host }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        priv: "*.*:PROCESS,REPLICATION CLIENT,SELECT"
+        state: present
+      register: exporter_user
+      until: exporter_user is succeeded
+      retries: 5
+      delay: 5
+
+    - name: Запустить сервисы мониторинга
+      ansible.builtin.command:
+        cmd: >-
+          docker compose up -d
+          mysqld_exporter_master
+          mysqld_exporter_slave
+          prometheus
+          grafana
+        chdir: "{{ project_dir }}"
+      become: true
+      register: monitoring_up
+      changed_when: >-
+        'Creating' in monitoring_up.stdout or
+        'Starting' in monitoring_up.stdout or
+        'Recreating' in monitoring_up.stdout
+
+    - name: Ждать доступность Grafana
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ grafana_port }}"
+        delay: 5
+        timeout: 180
+
+    - name: Проверить ответ Grafana
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ grafana_port }}/login"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: grafana_response
+      retries: 5
+      delay: 5
+      until: grafana_response.status == 200
+      changed_when: false
+
+    - name: Display Configuration Variables
+      ansible.builtin.debug:
+        msg:
+          - "monitoring_url: {{ monitoring_url }}"
+          - "prometheus_url: http://{{ ansible_host | default('localhost') }}:{{ prometheus_port }}"
