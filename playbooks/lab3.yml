@@ -2,6 +2,16 @@
 - name: Lab3 - Deploy monitoring for MySQL replication
   hosts: wordpress
   gather_facts: no
+  vars:
+    monitoring_services_base:
+      - db_master
+      - wordpress
+      - mysqld_exporter_master
+      - prometheus
+      - grafana
+    monitoring_services_replica:
+      - db_slave
+      - mysqld_exporter_slave
 
   pre_tasks:
     - name: Подготовить docker-compose для мониторинга
@@ -35,20 +45,12 @@
       delay: 5
 
     - name: Запустить сервисы мониторинга
-      ansible.builtin.command:
-        cmd: >-
-          docker compose up -d
-          mysqld_exporter_master
-          mysqld_exporter_slave
-          prometheus
-          grafana
-        chdir: "{{ project_dir }}"
+      community.docker.docker_compose_v2:
+        project_src: "{{ project_dir }}"
+        state: present
+        services: "{{ monitoring_services_base + (monitoring_services_replica if enable_replication | default(true) | bool else []) }}"
+        recreate: auto
       become: true
-      register: monitoring_up
-      changed_when: >-
-        'Creating' in monitoring_up.stdout or
-        'Starting' in monitoring_up.stdout or
-        'Recreating' in monitoring_up.stdout
 
     - name: Ждать доступность Grafana
       ansible.builtin.wait_for:
